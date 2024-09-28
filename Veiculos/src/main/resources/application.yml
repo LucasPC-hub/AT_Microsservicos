@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veiculos
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: veiculos
+  template:
+    metadata:
+      labels:
+        app: veiculos
+    spec:
+      containers:
+        - name: veiculos
+          image: lucaspcabral/veiculos:latest
+          env:
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://eureka-server:8761/eureka/
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/veiculosdb?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: root
+            - name: SERVER_PORT
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['port']
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "echo $(($RANDOM % 1000 + 8000)) > /tmp/server-port"]
+          volumeMounts:
+            - name: port-volume
+              mountPath: /tmp
+      volumes:
+        - name: port-volume
+          emptyDir: {}
