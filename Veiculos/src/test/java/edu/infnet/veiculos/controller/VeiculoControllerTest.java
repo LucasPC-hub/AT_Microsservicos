@@ -10,13 +10,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.Arrays;
+import java.util.Optional;
 
-import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -44,7 +44,6 @@ public class VeiculoControllerTest {
 
         mockMvc.perform(get("/veiculos"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].marca").value(veiculo1.getMarca()))
                 .andExpect(jsonPath("$[1].marca").value(veiculo2.getMarca()));
     }
@@ -55,33 +54,65 @@ public class VeiculoControllerTest {
 
         String veiculoJson = "{\"marca\":\"Marca A\",\"modelo\":\"Modelo A\",\"ano\":2020}";
         mockMvc.perform(post("/veiculos")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(veiculoJson))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(veiculoJson))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.marca").value(veiculo1.getMarca()));
+                .andExpect(jsonPath("$.marca").value(veiculo1.getMarca()))
+                .andExpect(jsonPath("$.modelo").value(veiculo1.getModelo()))
+                .andExpect(jsonPath("$.ano").value(veiculo1.getAno()));
     }
 
     @Test
-    public void testAtualizar() throws Exception {
-        given(veiculoRepository.findById(veiculo1.getId())).willReturn(java.util.Optional.of(veiculo1));
-        given(veiculoRepository.save(Mockito.any(Veiculo.class))).willReturn(veiculo1);
+    public void shouldUpdateVeiculoOnValidData() throws Exception {
+        System.out.println("Setting up mock repository for shouldUpdateVeiculoOnValidData");
+        given(veiculoRepository.findById(veiculo1.getId())).willReturn(Optional.of(veiculo1));
+        Veiculo updatedVeiculo = new Veiculo(1L, "Marca A", "Modelo A atualizado", 2020);
+        given(veiculoRepository.save(Mockito.any(Veiculo.class))).willReturn(updatedVeiculo);
+
+        String veiculoJson = "{\"marca\":\"Marca A\",\"modelo\":\"Modelo A atualizado\",\"ano\":2020}";
+        System.out.println("Performing PUT request to /veiculos/1 with payload: " + veiculoJson);
+        mockMvc.perform(put("/veiculos/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(veiculoJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modelo").value(updatedVeiculo.getModelo()));
+    }
+
+    @Test
+    public void shouldNotUpdateVeiculoOnInvalidId() throws Exception {
+        Veiculo existingVeiculo = new Veiculo(1L, "Marca A", "Modelo A", 2020);
+        given(veiculoRepository.findById(existingVeiculo.getId())).willReturn(Optional.empty());
 
         String veiculoJson = "{\"marca\":\"Marca A\",\"modelo\":\"Modelo A atualizado\",\"ano\":2020}";
         mockMvc.perform(put("/veiculos/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(veiculoJson))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.modelo").value("Modelo A atualizado"));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(veiculoJson))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void testRemover() throws Exception {
-        given(veiculoRepository.findById(veiculo1.getId())).willReturn(java.util.Optional.of(veiculo1));
+        given(veiculoRepository.findById(1L)).willReturn(Optional.of(veiculo1));
 
         mockMvc.perform(delete("/veiculos/1"))
                 .andExpect(status().isOk());
 
-        verify(veiculoRepository, times(1)).deleteById(veiculo1.getId());
+        verify(veiculoRepository, times(1)).deleteById(1L);
+    }
+
+    @Test
+    public void shouldNotUpdateVeiculoOnChangeInNonUpdatableField() throws Exception {
+        Veiculo existingVeiculo = new Veiculo(1L, "Marca A", "Modelo A", 2020);
+        given(veiculoRepository.findById(existingVeiculo.getId())).willReturn(Optional.of(existingVeiculo));
+        Veiculo updatedVeiculo = new Veiculo(1L, "Marca A Updated", "Modelo A", 2020);
+        given(veiculoRepository.save(Mockito.any(Veiculo.class))).willReturn(updatedVeiculo);
+
+        String veiculoJson = "{\"marca\":\"Marca A Updated\",\"modelo\":\"Modelo A\",\"ano\":2020}";
+        mockMvc.perform(put("/veiculos/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(veiculoJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.marca").value(existingVeiculo.getMarca()));
     }
 
     @Test

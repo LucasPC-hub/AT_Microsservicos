@@ -8,8 +8,9 @@ WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 
-# Build the project
-RUN mvn clean package -DskipTests
+# Build the project and verify the JAR file is created
+RUN mvn clean package -DskipTests && \
+    if [ ! -f target/EurekaServer-0.0.1-SNAPSHOT.jar ]; then echo "JAR file not found!"; exit 1; fi
 
 # Use the OpenJDK 17 image to run the application
 FROM openjdk:17-slim
@@ -18,7 +19,7 @@ FROM openjdk:17-slim
 WORKDIR /app
 
 # Copy the built JAR file
-COPY --from=build /app/target/eureka-server-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/EurekaServer-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose the port
 EXPOSE 8761
